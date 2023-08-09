@@ -42,17 +42,21 @@ import (
 // in a cluster.
 func Cluster(list map[string]*Template) [][]*Template {
 	final := [][]*Template{}
-
+        skip := make(map[string]struct{}, len(list))
 	// Each protocol that can be clustered should be handled here.
 	for key, template := range list {
 		// We only cluster http and dns requests as of now.
 		// Take care of requests that can't be clustered first.
+		if _, ok := skip[key]; ok {
+			continue
+		}
+		skip[key] = struct{}{}
 		if len(template.RequestsHTTP) == 0 && len(template.RequestsDNS) == 0 && len(template.RequestsSSL) == 0 {
-			delete(list, key)
+			//delete(list, key)
 			final = append(final, []*Template{template})
 			continue
 		}
-		delete(list, key) // delete element first so it's not found later.
+		//delete(list, key) // delete element first so it's not found later.
 
 		var templateType types.ProtocolType
 		switch {
@@ -68,26 +72,32 @@ func Cluster(list map[string]*Template) [][]*Template {
 		// this one and cluster them together for http protocol only.
 		cluster := []*Template{}
 		for otherKey, other := range list {
+			if _, ok := skip[otherKey]; ok {
+				continue
+			}
 			switch templateType {
 			case types.DNSProtocol:
 				if len(other.RequestsDNS) == 0 || len(other.RequestsDNS) > 1 {
 					continue
 				} else if template.RequestsDNS[0].CanCluster(other.RequestsDNS[0]) {
-					delete(list, otherKey)
+					//delete(list, otherKey)
+					skip[otherKey] = struct{}{}
 					cluster = append(cluster, other)
 				}
 			case types.HTTPProtocol:
 				if len(other.RequestsHTTP) == 0 || len(other.RequestsHTTP) > 1 {
 					continue
 				} else if template.RequestsHTTP[0].CanCluster(other.RequestsHTTP[0]) {
-					delete(list, otherKey)
+					//delete(list, otherKey)
+					skip[otherKey] = struct{}{}
 					cluster = append(cluster, other)
 				}
 			case types.SSLProtocol:
 				if len(other.RequestsSSL) == 0 || len(other.RequestsSSL) > 1 {
 					continue
 				} else if template.RequestsSSL[0].CanCluster(other.RequestsSSL[0]) {
-					delete(list, otherKey)
+					//delete(list, otherKey)
+					skip[otherKey] = struct{}{}
 					cluster = append(cluster, other)
 				}
 			}
